@@ -1,6 +1,6 @@
-const CACHE='orchid-schedule-v14';
-const ASSETS=['./','./index.html','./manifest.json','./icon.svg','./cloud-sync.js'];
+const CACHE='orchid-schedule-v15';
+const ASSETS=['./','./index.html','./manifest.json','./icon.svg','./auth-space.js'];
 self.addEventListener('install',e=>e.waitUntil((async()=>{const c=await caches.open(CACHE);await c.addAll(ASSETS);await self.skipWaiting()})()));
 self.addEventListener('activate',e=>e.waitUntil((async()=>{for(const k of await caches.keys())if(k!==CACHE)await caches.delete(k);await self.clients.claim()})()));
-async function withCloud(r){const text=await r.text();const html=text.includes('cloud-sync.js')?text:text.replace('</body>','<script src="cloud-sync.js?v=14"></script></body>');return new Response(html,{status:r.status,statusText:r.statusText,headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'}})}
-self.addEventListener('fetch',e=>{if(e.request.mode==='navigate'){e.respondWith(fetch(e.request,{cache:'no-store'}).then(withCloud).catch(async()=>withCloud(await caches.match('./index.html'))));return}e.respondWith(fetch(e.request).catch(()=>caches.match(e.request)))});
+async function withAuth(r){const text=await r.text();const html=text.includes('auth-space.js')?text:text.replace('</body>','<script src="auth-space.js?v=15"></script></body>');return new Response(html,{status:r.status,statusText:r.statusText,headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'}})}
+self.addEventListener('fetch',e=>{if(e.request.mode==='navigate'){e.respondWith(fetch(e.request,{cache:'no-store'}).then(withAuth).catch(async()=>withAuth(await caches.match('./index.html'))));return}e.respondWith(fetch(e.request).catch(()=>caches.match(e.request)))});
