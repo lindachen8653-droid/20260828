@@ -1,0 +1,10 @@
+{
+  "name":"2026 生活・工作・旅遊行事曆",
+  "short_name":"我的行事曆",
+  "start_url":"./index.html",
+  "display":"standalone",
+  "background_color":"#f7f3ee",
+  "theme_color":"#f6efe7",
+  "lang":"zh-Hant",
+  "icons":[{"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
+}
