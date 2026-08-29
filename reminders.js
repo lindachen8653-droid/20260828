@@ -1,135 +1,41 @@
 (()=>{
-const FIRED_KEY='orchid-reminder-fired-v1';
-const MAX_REMINDERS=3;
+const MAX=3;
+const SUPA='https://qyssezlnlcctjpuvgdyn.supabase.co';
+const PUB='sb_publishable_wqG2eaov7vSGWjxWRPdm_w_EIDDtmDR';
+const VAPID='BLBmTAfYNwWM5GgrVCgkEF69uknvCL6uw1RYJGOg06JCyuXKldGOqEsQRXSjcaVlHuu3cDsx7razaiV8eCk6vt4';
+const SPACE_KEY='orchid-active-space-v1';
 let todoEditingId=null;
-function escReminder(s){return String(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
-function addStyles(){
-  if(document.getElementById('orchidReminderStyle')) return;
-  const s=document.createElement('style');
-  s.id='orchidReminderStyle';
-  s.textContent=`
-  .reminderBox{grid-column:1/-1;border:1px solid var(--line);border-radius:16px;padding:12px;background:#fffafc}
-  .reminderHead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
-  .reminderToggle{display:flex;align-items:center;gap:7px;font-size:13px}
-  .reminderTimes{display:grid;grid-template-columns:1fr;gap:8px}
-  .reminderTimes input{width:100%;border:1px solid var(--line);background:white;border-radius:13px;padding:10px}
-  .reminderHint{font-size:11px;color:var(--muted);line-height:1.5;margin-top:7px}
-  .reminderBell{border:1px solid var(--line);background:white;border-radius:12px;padding:7px 9px}
-  .reminderBell.on{background:#fff1c9}
-  .reminderModal{display:none;position:fixed;inset:0;z-index:40;background:#0005;align-items:flex-end;justify-content:center}
-  .reminderModal.open{display:flex}
-  .reminderSheet{width:min(620px,100%);background:#fffaf9;border-radius:24px 24px 0 0;padding:18px;max-height:88vh;overflow:auto}
-  .notifyFab{position:fixed;right:88px;bottom:22px;z-index:15;border:1px solid var(--line);background:#fffefa;border-radius:50%;width:52px;height:52px;box-shadow:0 6px 18px #765b6530;font-size:21px}
-  @media(max-width:760px){.notifyFab{right:84px;bottom:22px}}
-  `;
-  document.head.appendChild(s);
-}
-function normalizeReminderList(item){
-  if(!item) return [];
-  if(!Array.isArray(item.reminders)) item.reminders=[];
-  return item.reminders.filter(x=>x&&x.at).slice(0,MAX_REMINDERS);
-}
-function addEventReminderFields(){
-  const grid=document.querySelector('#form .grid');
-  if(!grid || document.getElementById('eventReminderBox')) return;
-  const box=document.createElement('div');
-  box.className='reminderBox';
-  box.id='eventReminderBox';
-  box.innerHTML=`
-    <div class="reminderHead"><b>🔔 提醒</b><label class="reminderToggle"><input id="eventReminderEnabled" type="checkbox"> 開啟提醒</label></div>
-    <div class="reminderTimes"><input id="eventReminder1" type="datetime-local" aria-label="提醒時間 1"><input id="eventReminder2" type="datetime-local" aria-label="提醒時間 2"><input id="eventReminder3" type="datetime-local" aria-label="提醒時間 3"></div>
-    <div class="reminderHint">最多 3 個提醒時間。提醒會跟著共用空間同步。</div>`;
-  grid.appendChild(box);
-  const toggle=document.getElementById('eventReminderEnabled');
-  toggle.addEventListener('change',syncEventFields);
-  syncEventFields();
-}
-function syncEventFields(){
-  const on=document.getElementById('eventReminderEnabled')?.checked;
-  for(let i=1;i<=MAX_REMINDERS;i++){const el=document.getElementById('eventReminder'+i);if(el) el.disabled=!on;}
-}
-function setEventReminderForm(item){
-  addEventReminderFields();
-  const list=normalizeReminderList(item);
-  const enabled=item?.reminderEnabled===true || list.length>0;
-  const tog=document.getElementById('eventReminderEnabled');if(tog) tog.checked=enabled;
-  for(let i=1;i<=MAX_REMINDERS;i++){const el=document.getElementById('eventReminder'+i);if(el) el.value=list[i-1]?.at||'';}
-  syncEventFields();
-}
-function readEventReminderForm(){
-  const enabled=!!document.getElementById('eventReminderEnabled')?.checked;
-  const reminders=[];
-  if(enabled){for(let i=1;i<=MAX_REMINDERS;i++){const v=document.getElementById('eventReminder'+i)?.value;if(v) reminders.push({at:v});}}
-  return {reminderEnabled:enabled,reminders};
-}
-function wrapEventModal(){
-  if(typeof openNew==='function' && !window.__remOpenWrapped){const oldOpen=openNew;openNew=function(){oldOpen();setEventReminderForm(null)};window.__remOpenWrapped=true;}
-  if(typeof edit==='function' && !window.__remEditWrapped){const oldEdit=edit;edit=function(id){oldEdit(id);const item=typeof events!=='undefined'?events.find(x=>x.id===id):null;setEventReminderForm(item)};window.__remEditWrapped=true;}
-  const f=document.getElementById('form');
-  if(f && !f.dataset.reminderWrapped){
-    const oldSubmit=f.onsubmit;
-    f.onsubmit=function(ev){
-      const editingId=document.getElementById('eid')?.value||'';
-      const reminderData=readEventReminderForm();
-      const draftDate=document.getElementById('date')?.value||'';
-      const draftTitle=document.getElementById('title')?.value||'';
-      const result=oldSubmit.call(this,ev);
-      setTimeout(()=>{
-        if(typeof events==='undefined') return;
-        let item=editingId?events.find(x=>x.id===editingId):null;
-        if(!item)item=[...events].reverse().find(x=>x.date===draftDate&&x.title===draftTitle);
-        if(item){item.reminderEnabled=reminderData.reminderEnabled;item.reminders=reminderData.reminders;if(typeof persist==='function') persist();}
-      },0);
-      return result;
-    };
-    f.dataset.reminderWrapped='1';
-  }
-}
-function ensureTodoReminderModal(){
-  if(document.getElementById('todoReminderModal')) return;
-  const m=document.createElement('div');m.id='todoReminderModal';m.className='reminderModal';
-  m.innerHTML=`<div class="reminderSheet"><div class="sectionhead"><h3>🔔 待辦提醒</h3><button class="btn" id="todoReminderClose">✕</button></div><p id="todoReminderTitle" class="muted"></p><label class="reminderToggle" style="margin:10px 0"><input id="todoReminderEnabled" type="checkbox"> 開啟提醒</label><div class="reminderTimes"><input id="todoReminder1" type="datetime-local"><input id="todoReminder2" type="datetime-local"><input id="todoReminder3" type="datetime-local"></div><div class="reminderHint">最多 3 個提醒時間。</div><div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" id="todoReminderCancel">取消</button><button class="primary" id="todoReminderSave">儲存提醒</button></div></div>`;
-  document.body.appendChild(m);
-  document.getElementById('todoReminderClose').onclick=closeTodoReminder;
-  document.getElementById('todoReminderCancel').onclick=closeTodoReminder;
-  m.addEventListener('click',e=>{if(e.target===m)closeTodoReminder()});
-  document.getElementById('todoReminderEnabled').addEventListener('change',syncTodoFields);
-  document.getElementById('todoReminderSave').onclick=saveTodoReminder;
-}
-function syncTodoFields(){const on=document.getElementById('todoReminderEnabled')?.checked;for(let i=1;i<=MAX_REMINDERS;i++){const el=document.getElementById('todoReminder'+i);if(el)el.disabled=!on;}}
-function openTodoReminder(id){
-  ensureTodoReminderModal();if(typeof todos==='undefined')return;const item=todos.find(x=>x.id===id);if(!item)return;todoEditingId=id;
-  const list=normalizeReminderList(item);document.getElementById('todoReminderTitle').textContent=item.text||'待辦事項';document.getElementById('todoReminderEnabled').checked=item.reminderEnabled===true||list.length>0;
-  for(let i=1;i<=MAX_REMINDERS;i++)document.getElementById('todoReminder'+i).value=list[i-1]?.at||'';syncTodoFields();document.getElementById('todoReminderModal').classList.add('open');
-}
-function closeTodoReminder(){document.getElementById('todoReminderModal')?.classList.remove('open');todoEditingId=null;}
-function saveTodoReminder(){
-  if(typeof todos==='undefined'||!todoEditingId)return;const item=todos.find(x=>x.id===todoEditingId);if(!item)return;const enabled=document.getElementById('todoReminderEnabled').checked,list=[];
-  if(enabled){for(let i=1;i<=MAX_REMINDERS;i++){const v=document.getElementById('todoReminder'+i).value;if(v)list.push({at:v});}}
-  item.reminderEnabled=enabled;item.reminders=list;localStorage.setItem('orchid-todos-v1',JSON.stringify(todos));closeTodoReminder();if(typeof renderTodo==='function')renderTodo();
-}
-function decorateTodoList(){
-  if(typeof todos==='undefined')return;const list=document.querySelector('.todoList');if(!list)return;const rows=[...list.querySelectorAll('.todoItem')];
-  rows.forEach((row,i)=>{const item=todos[i];if(!item||row.querySelector('.reminderBell'))return;const b=document.createElement('button');b.type='button';b.className='reminderBell'+((item.reminderEnabled&&normalizeReminderList(item).length)?' on':'');b.textContent=(item.reminderEnabled&&normalizeReminderList(item).length)?'🔔':'🔕';b.title='設定提醒';b.onclick=()=>openTodoReminder(item.id);const del=row.querySelector('button.btn');if(del)row.insertBefore(b,del);else row.appendChild(b);});
-}
-function wrapTodoRender(){if(typeof renderTodo==='function'&&!window.__remTodoWrapped){const old=renderTodo;renderTodo=function(){const r=old();setTimeout(decorateTodoList,0);return r};window.__remTodoWrapped=true;renderTodo();}}
-async function requestNotify(){
-  if(!('Notification' in window)){alert("這台裝置目前不支援網頁通知。iPhone 建議先把 Orchid's Schedule 加到主畫面後再開啟提醒。");return;}
-  try{const p=await Notification.requestPermission();if(p==='granted'){alert('提醒通知已開啟 🔔');updateNotifyButton();}else alert('尚未允許通知。可以稍後從瀏覽器／系統設定開啟。');}catch{alert('目前無法要求通知權限。iPhone 請先將網站加入主畫面，再從主畫面開啟。');}
-}
-function addNotifyButton(){if(document.getElementById('orchidNotifyBtn'))return;const b=document.createElement('button');b.id='orchidNotifyBtn';b.className='notifyFab';b.type='button';b.onclick=requestNotify;document.body.appendChild(b);updateNotifyButton();}
-function updateNotifyButton(){const b=document.getElementById('orchidNotifyBtn');if(!b)return;b.textContent=('Notification' in window&&Notification.permission==='granted')?'🔔':'🔕';b.title='通知設定';}
-function firedMap(){try{return JSON.parse(localStorage.getItem(FIRED_KEY)||'{}')}catch{return {}}}
-function saveFired(x){localStorage.setItem(FIRED_KEY,JSON.stringify(x))}
-async function notify(title,body,tag){if(!('Notification' in window)||Notification.permission!=='granted')return;try{if('serviceWorker'in navigator){const reg=await navigator.serviceWorker.ready;await reg.showNotification(title,{body,tag,icon:'icon.svg',badge:'icon.svg',data:{url:location.href}});}else new Notification(title,{body,tag});}catch{}}
-function checkReminders(){
-  const now=Date.now(),fired=firedMap(),items=[];
-  if(typeof events!=='undefined')for(const e of events)items.push({id:e.id,title:e.title||'行程提醒',kind:'行程',enabled:e.reminderEnabled,list:normalizeReminderList(e)});
-  if(typeof todos!=='undefined')for(const t of todos)items.push({id:t.id,title:t.text||'待辦提醒',kind:'待辦',enabled:t.reminderEnabled,list:normalizeReminderList(t)});
-  let changed=false;
-  for(const item of items){if(!item.enabled)continue;for(const r of item.list){const when=new Date(r.at).getTime();if(!Number.isFinite(when))continue;const key=item.kind+'|'+item.id+'|'+r.at;if(!fired[key]&&when<=now&&when>=now-120000){fired[key]=now;changed=true;notify('🔔 '+item.kind+'提醒',item.title,key);}}}
-  const cutoff=now-1000*60*60*24*60;for(const k of Object.keys(fired))if(fired[k]<cutoff){delete fired[k];changed=true;}if(changed)saveFired(fired);
-}
-function init(){addStyles();addEventReminderFields();wrapEventModal();ensureTodoReminderModal();wrapTodoRender();addNotifyButton();checkReminders();setInterval(checkReminders,30000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkReminders()});}
-window.addEventListener('load',()=>setTimeout(init,0),{once:true});
+const PRESETS=[['5','5 分鐘前'],['10','10 分鐘前'],['15','15 分鐘前'],['30','30 分鐘前'],['60','1 小時前'],['120','2 小時前'],['1440','1 天前'],['2880','2 天前'],['custom','自訂日期與時間']];
+function css(){if(document.getElementById('orchidReminderStyle'))return;const s=document.createElement('style');s.id='orchidReminderStyle';s.textContent=`
+.reminderBox{grid-column:1/-1;padding:4px 0 2px}.reminderTop{display:flex;align-items:center;gap:10px;font-size:16px;font-weight:700;margin:8px 0 12px}.reminderTop input{width:22px;height:22px}.reminderRows{display:flex;flex-direction:column;gap:8px}.reminderRow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}.reminderSelect{width:100%;border:1px solid var(--line);background:white;border-radius:14px;padding:11px}.reminderCustom{grid-column:1/-1;width:100%;border:1px solid var(--line);background:white;border-radius:14px;padding:11px}.reminderDelete{border:1px solid var(--line);background:#fff;color:#338eea;border-radius:14px;padding:10px 12px}.reminderAdd{margin-top:10px;border:0;background:#f4efed;color:var(--text);border-radius:18px;padding:10px 14px}.reminderAdd:disabled{opacity:.45}.reminderHint{font-size:11px;color:var(--muted);margin-top:8px;line-height:1.5}.pushHint{font-size:11px;color:#9b848c;margin-top:7px}.reminderBell{border:1px solid var(--line);background:white;border-radius:12px;padding:7px 9px}.reminderBell.on{background:#fff1c9}.reminderModal{display:none;position:fixed;inset:0;z-index:45;background:#0005;align-items:flex-end;justify-content:center}.reminderModal.open{display:flex}.reminderSheet{width:min(620px,100%);background:#fffaf9;border-radius:24px 24px 0 0;padding:18px;max-height:90vh;overflow:auto}.notifyFab{position:fixed;right:84px;bottom:22px;z-index:15;border:1px solid var(--line);background:#fffefa;border-radius:50%;width:52px;height:52px;box-shadow:0 6px 18px #765b6530;font-size:21px}
+`;document.head.appendChild(s)}
+function optionHtml(v='30'){return PRESETS.map(([x,l])=>`<option value="${x}" ${String(v)===x?'selected':''}>${l}</option>`).join('')}
+function existing(item){return Array.isArray(item?.reminders)?item.reminders.slice(0,MAX):[]}
+function rowHtml(r={mode:'relative',minutes:30}){const v=r.mode==='custom'?'custom':String(r.minutes??30);return `<div class="reminderRow"><select class="reminderSelect">${optionHtml(v)}</select><button type="button" class="reminderDelete">刪除</button><input class="reminderCustom" type="datetime-local" value="${r.mode==='custom'?(r.at||''):''}" style="display:${v==='custom'?'block':'none'}"></div>`}
+function wireRows(root){root.querySelectorAll('.reminderRow').forEach(row=>{const sel=row.querySelector('.reminderSelect'),custom=row.querySelector('.reminderCustom');sel.onchange=()=>{custom.style.display=sel.value==='custom'?'block':'none'};row.querySelector('.reminderDelete').onclick=()=>{row.remove();updateAdd(root)}});updateAdd(root)}
+function addRow(root,r){const holder=root.querySelector('.reminderRows');if(holder.children.length>=MAX)return;holder.insertAdjacentHTML('beforeend',rowHtml(r));wireRows(root)}
+function updateAdd(root){const b=root.querySelector('.reminderAdd'),n=root.querySelectorAll('.reminderRow').length;if(b)b.disabled=n>=MAX}
+function formData(root,baseDateTime=null,todoMode=false){const on=root.querySelector('.reminderEnabled')?.checked;const out=[];if(!on)return {reminderEnabled:false,reminders:[]};for(const row of root.querySelectorAll('.reminderRow')){const v=row.querySelector('.reminderSelect').value;if(v==='custom'){const at=row.querySelector('.reminderCustom').value;if(at)out.push({mode:'custom',at,label:'自訂時間'})}else{const minutes=Number(v);let at='';if(todoMode){at=new Date(Date.now()+minutes*60000).toISOString().slice(0,16)}else if(baseDateTime){at=new Date(baseDateTime.getTime()-minutes*60000).toISOString().slice(0,16)}out.push({mode:'relative',minutes,label:PRESETS.find(x=>x[0]===v)?.[1]||`${minutes} 分鐘前`,at})}if(out.length>=MAX)break}return {reminderEnabled:true,reminders:out}}
+function baseEventTime(){const d=document.getElementById('date')?.value;if(!d)return null;const t=document.getElementById('start')?.value||'09:00';const x=new Date(`${d}T${t}`);return Number.isFinite(x.getTime())?x:null}
+function eventBox(){const grid=document.querySelector('#form .grid');if(!grid)return null;let box=document.getElementById('eventReminderBox');if(box)return box;box=document.createElement('div');box.id='eventReminderBox';box.className='reminderBox';box.innerHTML=`<label class="reminderTop"><input class="reminderEnabled" type="checkbox">✅ 開啟行程提醒</label><div class="reminderRows"></div><button type="button" class="reminderAdd">＋ 新增提醒</button><div class="reminderHint">每筆行程最多可設定 3 個提醒。</div><div class="pushHint">iPhone 鎖屏／APP 關閉推播需先「加入主畫面」並允許通知。</div>`;grid.appendChild(box);box.querySelector('.reminderAdd').onclick=()=>addRow(box);box.querySelector('.reminderEnabled').onchange=()=>{if(box.querySelector('.reminderEnabled').checked&&!box.querySelector('.reminderRow'))addRow(box)};return box}
+function fillEvent(item){const box=eventBox();if(!box)return;box.querySelector('.reminderRows').innerHTML='';const rs=existing(item);box.querySelector('.reminderEnabled').checked=item?.reminderEnabled===true||rs.length>0;(rs.length?rs:[{mode:'relative',minutes:30}]).forEach(r=>addRow(box,r));}
+function authState(){for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i)||'';if(/^sb-.*-auth-token$/.test(k)){try{const x=JSON.parse(localStorage.getItem(k)||'null');if(x?.access_token&&x?.user?.id)return x}catch{}}}return null}
+function activeSpace(){return localStorage.getItem(SPACE_KEY)||''}
+async function rpc(name,args){const a=authState();if(!a)return null;const r=await fetch(`${SUPA}/rest/v1/rpc/${name}`,{method:'POST',headers:{apikey:PUB,Authorization:`Bearer ${a.access_token}`,'Content-Type':'application/json'},body:JSON.stringify(args)});if(!r.ok)throw Error(await r.text());const text=await r.text();return text?JSON.parse(text):null}
+function toIsoTimes(rs){return rs.filter(r=>r.at).map(r=>{const d=new Date(r.at);return Number.isFinite(d.getTime())?d.toISOString():null}).filter(Boolean).slice(0,MAX)}
+async function syncServer(item,kind){try{const space=activeSpace();if(!space||!item?.id)return;await rpc('sync_item_reminders',{p_space_id:space,p_item_key:String(item.id),p_item_kind:kind,p_title:kind==='todo'?(item.text||'待辦事項'):(item.title||'行程'),p_times:item.reminderEnabled?toIsoTimes(existing(item)):[]})}catch(e){console.warn('reminder sync',e)}}
+function wrapEvent(){if(typeof openNew==='function'&&!window.__remOpen){const old=openNew;openNew=function(){old();fillEvent(null)};window.__remOpen=true}if(typeof edit==='function'&&!window.__remEdit){const old=edit;edit=function(id){old(id);fillEvent(typeof events!=='undefined'?events.find(x=>x.id===id):null)};window.__remEdit=true}const f=document.getElementById('form');if(f&&!f.dataset.reminderV2){const old=f.onsubmit;f.onsubmit=function(ev){const id=document.getElementById('eid')?.value||'';const d=document.getElementById('date')?.value||'';const title=document.getElementById('title')?.value||'';const rd=formData(eventBox(),baseEventTime(),false);const ret=old.call(this,ev);setTimeout(async()=>{if(typeof events==='undefined')return;let item=id?events.find(x=>x.id===id):null;if(!item)item=[...events].reverse().find(x=>x.date===d&&x.title===title);if(item){item.reminderEnabled=rd.reminderEnabled;item.reminders=rd.reminders;if(typeof persist==='function')persist();await syncServer(item,'event');if(rd.reminderEnabled&&rd.reminders.length)await ensurePush()}},50);return ret};f.dataset.reminderV2='1'}}
+function todoModal(){let m=document.getElementById('todoReminderModal');if(m)return m;m=document.createElement('div');m.id='todoReminderModal';m.className='reminderModal';m.innerHTML=`<div class="reminderSheet"><div class="sectionhead"><h3>🔔 待辦提醒</h3><button class="btn" id="todoReminderClose">✕</button></div><p id="todoReminderTitle" class="muted"></p><div id="todoReminderBox" class="reminderBox"><label class="reminderTop"><input class="reminderEnabled" type="checkbox">✅ 開啟待辦提醒</label><div class="reminderRows"></div><button type="button" class="reminderAdd">＋ 新增提醒</button><div class="reminderHint">每筆待辦最多可設定 3 個提醒。待辦的「30 分鐘前」等快速選項，會以目前時間往後計算；若要指定時間，選「自訂日期與時間」。</div></div><div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" id="todoReminderCancel">取消</button><button class="primary" id="todoReminderSave">儲存提醒</button></div></div>`;document.body.appendChild(m);const box=document.getElementById('todoReminderBox');box.querySelector('.reminderAdd').onclick=()=>addRow(box);box.querySelector('.reminderEnabled').onchange=()=>{if(box.querySelector('.reminderEnabled').checked&&!box.querySelector('.reminderRow'))addRow(box)};document.getElementById('todoReminderClose').onclick=closeTodo;document.getElementById('todoReminderCancel').onclick=closeTodo;m.onclick=e=>{if(e.target===m)closeTodo()};document.getElementById('todoReminderSave').onclick=saveTodo;return m}
+function openTodo(id){if(typeof todos==='undefined')return;const item=todos.find(x=>x.id===id);if(!item)return;todoEditingId=id;const m=todoModal(),box=document.getElementById('todoReminderBox');document.getElementById('todoReminderTitle').textContent=item.text||'待辦事項';box.querySelector('.reminderRows').innerHTML='';const rs=existing(item);box.querySelector('.reminderEnabled').checked=item.reminderEnabled===true||rs.length>0;(rs.length?rs:[{mode:'custom',at:''}]).forEach(r=>addRow(box,r));m.classList.add('open')}
+function closeTodo(){document.getElementById('todoReminderModal')?.classList.remove('open');todoEditingId=null}
+async function saveTodo(){if(typeof todos==='undefined'||!todoEditingId)return;const item=todos.find(x=>x.id===todoEditingId);if(!item)return;const rd=formData(document.getElementById('todoReminderBox'),null,true);item.reminderEnabled=rd.reminderEnabled;item.reminders=rd.reminders;localStorage.setItem('orchid-todos-v1',JSON.stringify(todos));await syncServer(item,'todo');if(rd.reminderEnabled&&rd.reminders.length)await ensurePush();closeTodo();if(typeof renderTodo==='function')renderTodo()}
+function decorateTodos(){if(typeof todos==='undefined')return;const list=document.querySelector('.todoList');if(!list)return;[...list.querySelectorAll('.todoItem')].forEach((row,i)=>{const item=todos[i];if(!item||row.querySelector('.reminderBell'))return;const b=document.createElement('button');b.type='button';b.className='reminderBell'+((item.reminderEnabled&&existing(item).length)?' on':'');b.textContent=(item.reminderEnabled&&existing(item).length)?'🔔':'🔕';b.onclick=()=>openTodo(item.id);const del=row.querySelector('button.btn');del?row.insertBefore(b,del):row.appendChild(b)})}
+function wrapTodo(){if(typeof renderTodo==='function'&&!window.__remTodo){const old=renderTodo;renderTodo=function(){const r=old();setTimeout(decorateTodos,0);return r};window.__remTodo=true;renderTodo()}}
+function b64urlToUint8(s){const pad='='.repeat((4-s.length%4)%4),b64=(s+pad).replace(/-/g,'+').replace(/_/g,'/'),raw=atob(b64),out=new Uint8Array(raw.length);for(let i=0;i<raw.length;i++)out[i]=raw.charCodeAt(i);return out}
+function isIOS(){return /iphone|ipad|ipod/i.test(navigator.userAgent)}function standalone(){return matchMedia('(display-mode: standalone)').matches||navigator.standalone===true}
+async function ensurePush(){if(!('serviceWorker'in navigator)||!('PushManager'in window)||!('Notification'in window)){alert('這台裝置目前不支援 Web Push。');return false}if(isIOS()&&!standalone()){alert("要讓 iPhone 在鎖屏或 APP 完全關閉時收到提醒，請先用 Safari 的「分享」→「加入主畫面」，再從主畫面的 Orchid's Schedule 開啟通知。");return false}let perm=Notification.permission;if(perm!=='granted')perm=await Notification.requestPermission();if(perm!=='granted')return false;const a=authState(),space=activeSpace();if(!a||!space)return false;const reg=await navigator.serviceWorker.ready;let sub=await reg.pushManager.getSubscription();if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64urlToUint8(VAPID)});const j=sub.toJSON();const r=await fetch(`${SUPA}/rest/v1/push_subscriptions?on_conflict=space_id,endpoint`,{method:'POST',headers:{apikey:PUB,Authorization:`Bearer ${a.access_token}`,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({user_id:a.user.id,space_id:space,endpoint:j.endpoint,p256dh:j.keys?.p256dh,auth_key:j.keys?.auth,user_agent:navigator.userAgent,updated_at:new Date().toISOString()})});if(!r.ok)throw Error(await r.text());updateNotify();return true}
+function addNotify(){if(document.getElementById('orchidNotifyBtn'))return;const b=document.createElement('button');b.id='orchidNotifyBtn';b.className='notifyFab';b.type='button';b.onclick=async()=>{try{const ok=await ensurePush();if(ok)alert('iPhone 推播提醒已開啟 🔔')}catch(e){alert('通知設定失敗：'+e.message)} };document.body.appendChild(b);updateNotify()}
+function updateNotify(){const b=document.getElementById('orchidNotifyBtn');if(!b)return;b.textContent=('Notification'in window&&Notification.permission==='granted')?'🔔':'🔕';b.title='推播通知設定'}
+function init(){css();eventBox();wrapEvent();todoModal();wrapTodo();addNotify()}
+window.addEventListener('load',()=>setTimeout(init,250),{once:true});
 })();
