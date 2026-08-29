@@ -1,6 +1,7 @@
-const CACHE='orchid-schedule-v16';
-const ASSETS=['./','./index.html','./manifest.json','./icon.svg','./auth-cloud.js'];
+const CACHE='orchid-schedule-v17';
+const ASSETS=['./','./index.html','./manifest.json','./icon.svg','./auth-cloud.js','./reminders.js'];
 self.addEventListener('install',e=>e.waitUntil((async()=>{const c=await caches.open(CACHE);await c.addAll(ASSETS);await self.skipWaiting()})()));
 self.addEventListener('activate',e=>e.waitUntil((async()=>{for(const k of await caches.keys())if(k!==CACHE)await caches.delete(k);await self.clients.claim()})()));
-async function withAuth(r){const text=await r.text();const html=text.includes('auth-cloud.js')?text:text.replace('</body>','<script type="module" src="auth-cloud.js?v=16"></script></body>');return new Response(html,{status:r.status,statusText:r.statusText,headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'}})}
-self.addEventListener('fetch',e=>{if(e.request.mode==='navigate'){e.respondWith(fetch(e.request,{cache:'no-store'}).then(withAuth).catch(async()=>withAuth(await caches.match('./index.html'))));return}e.respondWith(fetch(e.request).catch(()=>caches.match(e.request)))});
+async function withExtras(r){const text=await r.text();let html=text;if(!html.includes('auth-cloud.js'))html=html.replace('</body>','<script type="module" src="auth-cloud.js?v=17"></script></body>');if(!html.includes('reminders.js'))html=html.replace('</body>','<script src="reminders.js?v=17"></script></body>');return new Response(html,{status:r.status,statusText:r.statusText,headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'}})}
+self.addEventListener('fetch',e=>{if(e.request.mode==='navigate'){e.respondWith(fetch(e.request,{cache:'no-store'}).then(withExtras).catch(async()=>withExtras(await caches.match('./index.html'))));return}e.respondWith(fetch(e.request).catch(()=>caches.match(e.request)))});
+self.addEventListener('notificationclick',e=>{e.notification.close();const target=e.notification?.data?.url||'./';e.waitUntil((async()=>{const clientsList=await clients.matchAll({type:'window',includeUncontrolled:true});for(const c of clientsList){if('focus'in c){await c.focus();if('navigate'in c)await c.navigate(target);return}}if(clients.openWindow)await clients.openWindow(target)})())});
